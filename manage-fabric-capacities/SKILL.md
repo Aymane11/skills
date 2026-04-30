@@ -1,3 +1,13 @@
+---
+name: manage-fabric-capacities
+description: >
+  Use this skill whenever the user wants to manage Microsoft Fabric capacities using the Azure CLI.
+  Triggers include: listing, suspending, resuming, or checking Fabric capacities, checking name
+  availability, or listing eligible SKUs. Use even if the user just asks "how do I pause my Fabric
+  capacity" or mentions az fabric in passing.
+  NOT for: Fabric workspaces, items, pipelines, or the fab CLI tool.
+---
+
 # Azure Fabric Capacities Management
 
 Manage Microsoft Fabric capacities using Azure CLI (`az`).
@@ -43,8 +53,9 @@ az fabric capacity resume \
 
 ```bash
 az fabric capacity check-name-availability \
+  --location <location> \
   --name <capacity-name> \
-  --location <location>
+  --type Microsoft.Fabric/capacities
 ```
 
 ### List eligible SKUs
