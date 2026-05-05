@@ -31,3 +31,51 @@ Detailed documentation in the `references/` folder:
 | [querying-data.md](./references/querying-data.md) | DAX and lakehouse table queries |
 | [fab-api.md](./references/fab-api.md) | Direct REST API access patterns |
 | [create-workspaces.md](./references/create-workspaces.md) | Workspace creation workflows |
+
+---
+
+## Workspace Export
+
+### Setup (Avoid Interactive Prompts)
+
+Before exporting, set Fabric CLI to command-line mode to avoid interactive prompts:
+
+```bash
+fab config set mode command_line
+```
+
+### Export Entire Workspace
+
+To export all items from a workspace (notebooks, pipelines, lakehouses, etc.):
+
+```bash
+# Export all items with force flag (skip sensitivity label warnings)
+fab export "WorkspaceName.Workspace" -o "/path/to/output" -a -f
+```
+
+Flags:
+- `-a, --all` - Export all items in the workspace
+- `-f, --force` - Force export without confirmation prompts
+
+Example:
+```bash
+fab export "Facilities - Production.Workspace" -o "./export/Facilities_Production" -a -f
+```
+
+### Export Single Item
+
+```bash
+fab export "WorkspaceName.Workspace/NotebookName.Notebook" -o "/path/to/output" -f
+```
+
+### Export to Lakehouse
+
+```bash
+fab export "ws1.Workspace/lh1.Lakehouse/Files/export" -f -o "ws1.Workspace/lh1.Lakehouse"
+```
+
+### Notes
+- Export creates a folder with item name (e.g., `notebook-name.Notebook/`)
+- Each export includes `.platform` file and `notebook-content.ipynb` (for notebooks)
+- For pipelines, exports as JSON definition
+- Use parallel agents to export multiple workspaces simultaneously

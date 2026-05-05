@@ -25,6 +25,12 @@ Manage Microsoft Fabric capacities using Azure CLI (`az`).
 az fabric capacity list
 ```
 
+### List capacities names and resource groups only
+
+```bash
+az fabric capacity list --query '[].{name:name, resourceGroup:resourceGroup}' -o tsv
+```
+
 ### Get capacity details
 
 ```bash
@@ -69,7 +75,7 @@ az fabric capacity list-skus
 ### Pause all active capacities
 
 ```bash
-# Get all capacities
+# Get all active capacities
 az fabric capacity list --query '[?state=="Active"].{name:name, resourceGroup:resourceGroup}' -o tsv | \
 while read -r name rg; do
   az fabric capacity suspend --resource-group "$rg" --capacity-name "$name"
@@ -91,3 +97,30 @@ done
 - `Paused` - Capacity is suspended
 - `Suspending` - In the process of pausing
 - `Resuming` - In the process of resuming
+
+## Known Capacities
+
+Use `az fabric capacity list` to get the current list. Known capacities:
+
+| Capacity Name | Resource Group | Environment | Project |
+|---------------|----------------|--------------| --------- |
+| tourbafcwesteuropestg | tourba-dev | staging | Tourba (staging and dev environments) |
+| tourbafcwesteuropeprod | tourba-prod | production | Tourba (production environment) |
+| facilitiesfcwesteuropestg | facilities-stg | staging | Facilities (staging and dev environments) |
+| facilitiesfcwesteuropeprod | facilities-prod | production | Facilities (production environment) |
+
+**Important**: This capacity list is not exhaustive. It includes only capacities for projects Facilities and Tourba.
+**Important**: The resource group name is NOT the same as the capacity name. Always use `az fabric capacity list` to find the correct resource group.
+
+
+### Example: Resume Facilities Production Capacity
+
+```bash
+az fabric capacity resume --resource-group "facilities-prod" --capacity-name "facilitiesfcwesteuropeprod"
+```
+
+### Example: Pause Facilities Staging Capacity
+
+```bash
+az fabric capacity suspend --resource-group "facilities-stg" --capacity-name "facilitiesfcwesteuropestg"
+```

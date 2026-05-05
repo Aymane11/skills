@@ -1,0 +1,5 @@
+{
+  "name": "track-pipeline-skill",
+  "version": "1.0.0",
+  "description": "Monitor Microsoft Fabric pipeline runs via track_pipeline.py"
+}
