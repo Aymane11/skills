@@ -1,3 +1,8 @@
+---
+name: project-conventions-maintenance
+description: Keep agent instruction files (AGENTS.md, CLAUDE.md, .gitignore) in sync with actual codebase changes. Activate when user mentions AGENTS.md is out of date, changed project structure, wants docs updated, or when conventions, dependencies, build process, or rules change.
+---
+
 # Skill: Project Conventions Maintenance
 
 Keep agent instruction files (AGENTS.md, CLAUDE.md, .gitignore) in sync with actual codebase changes.
