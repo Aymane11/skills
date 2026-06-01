@@ -18,7 +18,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from rich.console import Console
 from rich.panel import Panel
@@ -285,6 +285,51 @@ def extract_params(input_dict: Optional[dict]) -> Dict[str, str]:
     return out
 
 
+def extract_notebook_details(act: dict, ws_id: str) -> Dict[str, any]:
+    """
+    Extract Fabric UI URLs and metadata for a TridentNotebook activity.
+    Returns a dict with snapshotUrl, sparkMonitoringUrl, exitValue, error, etc.
+    """
+    inp = act.get("input") or {}
+    outp = act.get("output") or {}
+    result = outp.get("result") or {}
+    nb_id = inp.get("notebookId", "")
+    act_run_id = act.get("activityRunId", "")
+
+    details: Dict[str, Any] = {}
+
+    # Snapshot URL: always constructable from activityRunId (== jobInstanceId)
+    run_id = result.get("runId") or act_run_id
+    if ws_id and nb_id and run_id:
+        details["snapshotUrl"] = (
+            f"https://app.fabric.microsoft.com/groups/{ws_id}"
+            f"/synapsenotebooks/{nb_id}/snapshots/{run_id}?experience=power-bi"
+        )
+
+    # Spark monitoring URL from activity output
+    spark_rel = outp.get("SparkMonitoringURL", "")
+    if spark_rel:
+        details["sparkMonitoringUrl"] = f"https://app.fabric.microsoft.com/{spark_rel}?experience=power-bi"
+
+    # Notebook-level result metadata
+    if result:
+        if result.get("runStatus"):
+            details["runStatus"] = result["runStatus"]
+        if result.get("exitValue") is not None:
+            details["exitValue"] = result["exitValue"]
+        if result.get("error"):
+            details["notebookError"] = result["error"]
+        if result.get("sessionId"):
+            details["sessionId"] = result["sessionId"]
+        meta = result.get("metadata") or {}
+        if meta.get("runStartTime"):
+            details["notebookStartTime"] = meta["runStartTime"]
+        if meta.get("runEndTime"):
+            details["notebookEndTime"] = meta["runEndTime"]
+
+    return details
+
+
 def fetch_child_run(child_ws: str, child_run: str, after: str, before: str) -> Tuple[dict, list]:
     """Fetch notebooks map + tagged activities for one child pipeline run."""
     try:
@@ -442,10 +487,10 @@ def make_activity_label(act: dict, ws_name: str, nb_map: dict, items: dict) -> T
     return label
 
 
-def attach_activity_details(node, act: dict, nb_map: dict, compact: bool = False) -> None:
+def attach_activity_details(node, act: dict, nb_map: dict, ws_id: str = "", compact: bool = False) -> None:
     """Attach type-specific detail sub-nodes (error, params, lookup results, etc.).
 
-    In compact mode, only show errors; hide params, lookups, and SetVariable details.
+    In compact mode, only show errors and notebook URLs; hide params, lookups, and SetVariable details.
     """
     atype = act["activityType"]
     inp   = act.get("input") or {}
@@ -456,8 +501,12 @@ def attach_activity_details(node, act: dict, nb_map: dict, compact: bool = False
     if err and err not in ("", "null"):
         node.add(Text(f"⚠  {err}", style="red"))
 
+    # Always show notebook URLs, even in compact mode
+    if atype == "TridentNotebook":
+        _attach_notebook_details(node, act, ws_id, compact=compact)
+
     if compact:
-        return  # skip all details in compact mode
+        return  # skip remaining details in compact mode
 
     params = extract_params(inp)
     if params:
@@ -474,24 +523,56 @@ def attach_activity_details(node, act: dict, nb_map: dict, compact: bool = False
 
 
 def _attach_lookup_details(node, inp: dict, outp: dict) -> None:
-    db    = ((inp.get("datasetSettings") or {}).get("typeProperties") or {}).get("database", "")
-    sql   = ((inp.get("source") or {}).get("sqlReaderQuery") or "").strip()
-    count = outp.get("count")
-    rows  = outp.get("value") or []
+    """Attach Lookup activity source and output value."""
+    from rich.table import Table
 
-    if db:
-        node.add(Text(f"🗄  {db}", style="dim"))
-    if sql:
-        node.add(Text("🔎 query", style="bold dim")).add(Text(sql, style="dim italic"))
-    if count is not None:
-        res_node = node.add(Text(f"📊 {count} row(s)", style="bold dim"))
-        if rows:
-            tbl = Table(box=None, show_header=True, padding=(0, 1, 0, 0), header_style="bold dim cyan")
-            for col in rows[0].keys():
-                tbl.add_column(col, style="dim", no_wrap=True)
-            for row in rows:
-                tbl.add_row(*[str(v) for v in row.values()])
-            res_node.add(tbl)
+    src = inp.get("source", {})
+    ds  = inp.get("dataset", {})
+    if ds.get("referenceName"):
+        node.add(Text(f"📋  dataset: {ds['referenceName']}", style="dim"))
+    if src.get("type"):
+        node.add(Text(f"📋  source type: {src['type']}", style="dim"))
+    query = src.get("query") or inp.get("query")
+    if query:
+        node.add(Text(f"🔍  query: {query}", style="dim"))
+
+    value = outp.get("firstRow") or outp.get("count")
+    if value is not None:
+        val_str = json.dumps(value, default=str) if isinstance(value, (dict, list)) else str(value)
+        node.add(Text(f"📄  result: {val_str[:300]}", style="green"))
+
+
+def _attach_notebook_details(node, act: dict, ws_id: str, compact: bool = False) -> None:
+    """Attach notebook-specific details: snapshot URL, Spark monitoring URL, exitValue, errors."""
+    details = extract_notebook_details(act, ws_id)
+
+    # Snapshot URL (always show if we can construct it)
+    snap = details.get("snapshotUrl")
+    if snap:
+        snap_text = Text("📸  snapshot  ", style="bold cyan")
+        snap_text.append(snap, style="link " + snap)
+        node.add(snap_text)
+
+    # Spark monitoring URL
+    spark = details.get("sparkMonitoringUrl")
+    if spark:
+        spark_text = Text("🔥  spark ui   ", style="bold bright_yellow")
+        spark_text.append(spark, style="link " + spark)
+        node.add(spark_text)
+
+    # Notebook-level error (from result.error, different from top-level activity error)
+    nb_err = details.get("notebookError")
+    if nb_err:
+        node.add(Text(f"📕  notebook error: {nb_err}", style="red"))
+
+    if compact:
+        return
+
+    # Exit value
+    exit_val = details.get("exitValue")
+    if exit_val is not None:
+        exit_str = json.dumps(exit_val) if isinstance(exit_val, (dict, list)) else str(exit_val)
+        node.add(Text(f"🏁  exit value: {exit_str}", style="green"))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -533,10 +614,10 @@ def build_tree(
         label = make_activity_label(act, act_ws_name, nb_map, child_items)
         node  = parent_node.add(label)
 
-        attach_activity_details(node, act, nb_map, compact=compact)
+        attach_activity_details(node, act, nb_map, ws_id=ws_id, compact=compact)
 
         if atype == "ForEach":
-            _build_foreach_children(node, foreach_children.get(act["activityName"], []), nb_map, current_ws_name, items, compact=compact)
+            _build_foreach_children(node, foreach_children.get(act["activityName"], []), nb_map, current_ws_name, items, ws_id=ws_id, compact=compact)
 
         elif atype == "InvokePipeline" and child_ws:
             child_run = child_run or act.get("_resolved_child_run_id")
@@ -552,12 +633,12 @@ def build_tree(
                 node.add(Text("(child run ID not yet available)", style="dim"))
 
 
-def _build_foreach_children(fe_node, children: List[dict], nb_map: dict, ws_name: str, items: dict, compact: bool = False) -> None:
+def _build_foreach_children(fe_node, children: List[dict], nb_map: dict, ws_name: str, items: dict, ws_id: str = "", compact: bool = False) -> None:
     header = fe_node.add(Text(f"↻  {len(children)} iteration(s)", style="bold magenta"))
     for child in children:
         label = make_activity_label(child, ws_name, nb_map, items)
         cnode = header.add(label)
-        attach_activity_details(cnode, child, nb_map, compact=compact)
+        attach_activity_details(cnode, child, nb_map, ws_id=ws_id, compact=compact)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -625,7 +706,7 @@ def print_running_summary(tagged: List[dict], ws_name_by_id: dict, nb_map: dict,
 # JSON export
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _activity_to_dict(act: dict, parent_name: Optional[str] = None) -> dict:
+def _activity_to_dict(act: dict, ws_id: str = "", parent_name: Optional[str] = None) -> dict:
     """Convert a single activity to JSON-serializable dict."""
     inp = act.get("input") or {}
     outp = act.get("output") or {}
@@ -656,6 +737,9 @@ def _activity_to_dict(act: dict, parent_name: Optional[str] = None) -> dict:
         nb_id = inp.get("notebookId")
         if nb_id:
             result["notebookId"] = nb_id
+        nb_details = extract_notebook_details(act, ws_id)
+        if nb_details:
+            result["notebookDetails"] = nb_details
 
     elif act["activityType"] == "InvokePipeline":
         pl_id = inp.get("pipelineId")
@@ -689,7 +773,7 @@ def _activity_to_dict(act: dict, parent_name: Optional[str] = None) -> dict:
     return result
 
 
-def export_to_json(filepath: str, master: dict, tagged: List[dict], nb_map: dict) -> None:
+def export_to_json(filepath: str, master: dict, tagged: List[dict], nb_map: dict, ws_id: str = "") -> None:
     """Export pipeline run to JSON file."""
     # Build ForEach parent mapping
     fe_names = {a["activityName"] for a in tagged if a["activityType"] == "ForEach"}
@@ -704,7 +788,7 @@ def export_to_json(filepath: str, master: dict, tagged: List[dict], nb_map: dict
 
     for act in tagged:
         if act["activityType"] == "ForEach":
-            top_level.append(_activity_to_dict(act))
+            top_level.append(_activity_to_dict(act, ws_id=ws_id))
         else:
             start = act.get("activityRunStart", "")
             parent = None
@@ -713,9 +797,9 @@ def export_to_json(filepath: str, master: dict, tagged: List[dict], nb_map: dict
                     parent = fe_name
                     break
             if parent:
-                foreach_children.setdefault(parent, []).append(_activity_to_dict(act, parent_name=parent))
+                foreach_children.setdefault(parent, []).append(_activity_to_dict(act, ws_id=ws_id, parent_name=parent))
             else:
-                top_level.append(_activity_to_dict(act))
+                top_level.append(_activity_to_dict(act, ws_id=ws_id))
 
     # Add ForEach children back into their parents
     for activity in top_level:
@@ -869,7 +953,7 @@ def main() -> None:
         sys.exit(0)
 
     if args.export:
-        export_to_json(args.export, master, tagged, nb_map)
+        export_to_json(args.export, master, tagged, nb_map, ws_id=ws_id)
     else:
         print_header(pipeline, run_id, master, style, sym)
 

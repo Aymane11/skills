@@ -4,8 +4,10 @@ description: >
   Use this skill whenever the user wants to interact with Microsoft Fabric using the `fab` CLI tool locally.
   Triggers include: installing or configuring the Fabric CLI, authenticating to a Fabric tenant,
   listing workspaces or their contents, exporting or importing Fabric items, inspecting or querying
-  item properties, copying, moving, or deleting items. Use this skill even if the user just asks
-  "how do I use fab", "how do I list my workspaces", or mentions fabric-cli in passing.
+  item properties, copying, moving, or deleting items.
+  Also use when the user mentions Fabric workspaces, notebooks, lakehouses, reports, semantic models,
+  data pipelines, Spark jobs, OneLake, or says things like "how do I use fab", "how do I list my workspaces",
+  "export this notebook", or mentions fabric-cli in passing.
   NOT for: fabric-cicd, deployment pipelines, or CI/CD automation.
 ---
 

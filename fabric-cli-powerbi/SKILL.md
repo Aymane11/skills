@@ -1,6 +1,15 @@
 ---
 name: fabric-cli-powerbi
-description: Use Fabric CLI for Power BI operations — semantic models, reports, DAX queries, refresh, gateways. Activate when users work with Power BI items, need to refresh datasets, execute DAX, manage reports, or troubleshoot refresh failures.
+description: >
+  Use Fabric CLI for Power BI operations inside Microsoft Fabric: semantic models (datasets),
+  reports, dashboards, DAX queries, refresh schedules, gateway configuration, and TMDL.
+  Activate when users work with Power BI items, need to refresh datasets, execute DAX,
+  manage reports, troubleshoot refresh failures, rebind reports, export to PDF/PPTX,
+  or configure on-premises data gateways.
+  Also trigger for: "Power BI dataset", "semantic model refresh", "report rebind",
+  "TMDL export", "gateway data source", or "why did my refresh fail".
+  NOT for: general Fabric workspace/item management (use fabric-cli or fabric-cli-core),
+  lakehouse file operations (use fabric-lakehouse-files), or capacity management.
 ---
 
 # Fabric CLI Power BI Operations

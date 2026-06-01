@@ -1,6 +1,16 @@
 ---
 name: fabric-cli-core
-description: Use Microsoft Fabric CLI (fab) to manage workspaces, semantic models, reports, notebooks, and Fabric resources. Activate when users mention fab, Fabric CLI, or need to automate Fabric operations.
+description: >
+  Use this skill for Microsoft Fabric CLI (`fab`) fundamentals: workspaces, semantic models,
+  reports, notebooks, lakehouses, data pipelines, and all Fabric resources.
+  Use whenever the user mentions `fab`, Fabric CLI, OneLake, Fabric workspace, or needs to
+  automate, list, get, export, import, copy, or move Fabric items.
+  Also trigger when users ask about Fabric authentication, `fab auth`, CLI path conventions,
+  hidden entities (.capacities, .gateways), or Fabric item types like .Notebook, .Lakehouse,
+  .SemanticModel, .Report.
+  NOT for: Azure Fabric capacity management (use manage-fabric-capacities), Power BI-specific
+  refresh/DAX operations (use fabric-cli-powerbi), lakehouse file uploads/downloads (use
+  fabric-lakehouse-files), or pipeline run monitoring (use track-pipeline).
 ---
 
 # Fabric CLI Core
