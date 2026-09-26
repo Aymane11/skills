@@ -7,9 +7,10 @@ description: Use fast-flights to scrape Google Flights and get flight informatio
 
 A fast, robust Google Flights scraper (API) for Python. It uses Base64-encoded Protobuf to query Google Flights and retrieve flight data.
 
-**PyPI Package:** `fast-flights` v3.1.0 (requires Python >= 3.10)
+**PyPI Package:** `fast-flights` v3.1.0 (requires Python >= 3.10, latest on PyPI)
 **Repository:** https://github.com/AWeirdDev/flights
-**Docs:** https://aweirddev.github.io/flights
+**Docs:** https://flights.aweird.me/docs/ (note: parts of the docs are stale —
+see "Docs inconsistencies" below; this skill follows the installed source)
 
 ## Installation
 
@@ -32,8 +33,8 @@ query = create_query(
     flights=[
         FlightQuery(date="2026-06-09", from_airport="TNG", to_airport="BVA"),
     ],
-    trip="one-way",           # or "round-trip", "multi-city"
-    passengers=Passengers(adults=1),
+    trip="one-way",           # or "round-trip" ("multi-city" is unimplemented per docs)
+    passengers=Passengers(adults=1),  # total pax <= 9; >= 1 adult per infant on lap
     seat="economy",           # "economy", "premium-economy", "business", "first"
     currency="MAD",           # e.g. "USD", "EUR", "MAD"; "" lets Google decide
     language="en",            # "" lets Google decide
@@ -59,6 +60,20 @@ With proxy or an integration:
 result = get_flights(query, proxy="http://user:pass@host:port")
 ```
 
+Alternative: `get_flights` also accepts a natural-language string instead of
+a `Query` (per https://flights.aweird.me/docs/queries/):
+
+```python
+result = get_flights("Flights from TPE to MYJ on 2067-06-07 one way economy class")
+```
+
+For debugging you can inspect the generated `tfs` parameter:
+
+```python
+query.to_bytes()  # Base64-encoded (bytes)
+query.to_str()    # Serialize to string
+```
+
 ## Core Components
 
 ### FlightQuery
@@ -68,7 +83,10 @@ Defines a single flight segment with per-leg filters:
 - `from_airport`: Three-letter IATA airport code (e.g., "CMN", "CDG", "TNG")
 - `to_airport`: Three-letter IATA airport code
 - `max_stops`: Optional maximum stops (e.g., 0 for direct only)
-- `airlines`: Optional list of airline/alliance codes (e.g., `["JL", "ONEWORLD"]`; the first leg's filter applies to the whole search).
+- `airlines`: Optional list of airline/alliance codes. Must be valid 2-letter
+  IATA codes (case-insensitive, e.g. `"JL"`, `"FR"`) or one of `SKYTEAM`,
+  `STAR_ALLIANCE`, `ONEWORLD`; only the FIRST leg's filter is honored by the
+  server (others ignored).
   WARNING: server-side `airlines` filtering is unreliable — e.g. `airlines=["FR"]`
   raises `'NoneType' object is not subscriptable` when there is no match
   (observed LYS->MAD). Do NOT use it to find low-cost carriers; fetch all
@@ -88,11 +106,15 @@ Configures passenger count:
 - `infants_in_seat`: Number of infants with a seat
 - `infants_on_lap`: Number of infants on lap
 
+Validation (per docs): total of all four must not exceed 9, and there must be
+at least one adult per infant on lap.
+
 ### create_query()
 
 Creates a flight query with:
 - `flights`: List of `FlightQuery` objects
-- `trip`: Trip type - `"one-way"`, `"round-trip"`, or `"multi-city"`
+- `trip`: `"one-way"` or `"round-trip"` (`"multi-city"` is unimplemented per
+  docs; `round-trip` requires 2+ `FlightQuery` objects)
 - `passengers`: `Passengers` object
 - `seat`: Cabin class - `"economy"`, `"premium-economy"`, `"business"`, or `"first"`
 - `language`: e.g., `"en"`, `"zh-TW"`; `""` lets Google decide
@@ -364,7 +386,7 @@ question: "Is this a one-way or round-trip flight?"
 options: [
   {label: "One-way", description: "Flying to destination only"},
   {label: "Round-trip", description: "Return flight included"},
-  {label: "Multi-city", description: "Multiple destinations"},
+  {label: "Multi-city", description: "Multiple destinations (NOT supported by fast-flights — would need separate one-way searches)"},
 ]
 ```
 
@@ -455,6 +477,18 @@ morocco_to_london = [
     ("RAK", "LGW"), ("RAK", "STN"),
 ]
 ```
+
+## Docs inconsistencies (docs vs installed v3.1.0 source)
+
+Verified against the installed package source; trust this skill over the docs here:
+- The docs front page shows `result: ResultList = create_query(...)` and never
+  calls `get_flights` — WRONG. `create_query` returns a `Query`; you must call
+  `get_flights(query)` to get the `ResultList`.
+- The docs "Example" section shows `create_query(flight_data=[...])` — WRONG
+  param name. The real keyword is `flights=[...]` (the top Queries-page example
+  gets this right).
+- Docs say `multi-city` is unimplemented and `round-trip` needs 2+ `FlightQuery`
+  objects — honor that; do not offer multi-city as a working option.
 
 ## Useful Airport Codes
 
